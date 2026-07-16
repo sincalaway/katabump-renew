@@ -338,6 +338,15 @@ def login(sb) -> bool:
         sb.save_screenshot("turnstile_invisible_fail.png")
         return False
 
+    print("⏳ 提交前额外等待 Turnstile 完成...")
+    for _ in range(12):
+        if sb.execute_script(_SOLVED_JS):
+            print("✅ Turnstile 已通过，可以提交")
+            break
+        time.sleep(1)
+    else:
+        print("⚠️ Turnstile 可能仍未完成，继续提交...")
+
     print("🖱️ 敲击回车提交表单...")
     sb.press_keys('input[name="password"]', '\n')
 
