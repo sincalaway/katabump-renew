@@ -314,23 +314,29 @@ def login(sb) -> bool:
     js_fill_input(sb, 'input[name="password"]', PASSWORD)
     time.sleep(1)
 
-    # 等待 Turnstile 验证框出现（最多 10 秒）
-    print("⏳ 等待 Turnstile 验证框出现...")
+        # === 增强版 Turnstile 等待与处理 ===
+    print("⏳ 等待 Turnstile 验证框出现或隐式验证...")
     ts_found = False
-    for i in range(10):
+    for i in range(15):   # 增加等待时间
         if sb.execute_script(_EXISTS_JS):
             ts_found = True
             print(f"✅ 检测到 Turnstile（{i+1}s）")
             break
+        
+        # 额外检查页面是否已有 Turnstile 响应（invisible 模式）
+        if sb.execute_script("return document.querySelector('input[name=\"cf-turnstile-response\"]') !== null;"):
+            ts_found = True
+            print(f"✅ 检测到隐式 Turnstile（{i+1}s）")
+            break
+            
         time.sleep(1)
 
-    if ts_found:
-        if not handle_turnstile(sb):
-            print("❌ 登录界面的 Turnstile 验证失败")
-            sb.save_screenshot("login_turnstile_fail.png")
-            return False
-    else:
-        print("ℹ️ 未检测到 Turnstile")
+    # 无论是否检测到，都尝试处理
+    print("🔍 执行 Turnstile 处理流程...")
+    if not handle_turnstile(sb):
+        print("❌ Turnstile 处理失败")
+        sb.save_screenshot("turnstile_invisible_fail.png")
+        return False
 
     print("🖱️ 敲击回车提交表单...")
     sb.press_keys('input[name="password"]', '\n')
