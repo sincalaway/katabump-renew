@@ -202,7 +202,7 @@ def _xdotool_click(x: int, y: int):
     except Exception:
         os.system(f"xdotool mousemove {x} {y} click 1 2>/dev/null")
 
-#  人机验证处理（使用 SeleniumBase 内置 uc_gui_click_captcha）
+# 人机验证处理（使用 SeleniumBase 内置 uc_gui_click_captcha）
 def handle_turnstile(sb) -> bool:
     print("🔍 处理 Cloudflare Turnstile 验证...")
     time.sleep(2)
@@ -212,15 +212,26 @@ def handle_turnstile(sb) -> bool:
         print("✅ 已静默通过")
         return True
 
-    # 尝试展开 Turnstile（防止被父容器 overflow:hidden 裁剪）
-    for _ in range(3):
-        try: sb.execute_script(_EXPAND_JS)
-        except Exception: pass
-        time.sleep(0.5)
+    # ==================== 增强展开逻辑 ====================
+    print("🔧 尝试多次展开 Turnstile iframe...")
+    for _ in range(5):  # 从3次增加到5次
+        try:
+            sb.execute_script(_EXPAND_JS)
+            sb.execute_script(_ALTCHA_EXPAND_JS)  # 额外尝试 ALTCHA 展开（兼容性）
+        except Exception:
+            pass
+        time.sleep(0.8)
 
-    # 使用 SeleniumBase 内置 uc_gui_click_captcha 处理 Turnstile
-    # 该方法自动完成：检测验证码类型 → 定位 iframe → 计算坐标 → PyAutoGUI 平滑点击
-    for attempt in range(6):
+    # 模拟人类行为：轻微滚动 + 随机移动
+    try:
+        sb.execute_script("window.scrollBy(0, 150);")
+        time.sleep(0.5)
+        sb.execute_script("window.scrollBy(0, -80);")
+    except:
+        pass
+
+    # ==================== 主点击循环 ====================
+    for attempt in range(8):  # 从6次增加到8次
         if sb.execute_script(_SOLVED_JS):
             print(f"✅ Turnstile 通过（第 {attempt} 次尝试）")
             return True
@@ -231,8 +242,8 @@ def handle_turnstile(sb) -> bool:
         except Exception as e:
             print(f"⚠️ uc_gui_click_captcha 调用异常: {e}")
 
-        # 等待验证结果（最多 8 秒）
-        for _ in range(16):
+        # 更长的等待时间 + 分段检查
+        for wait in range(20):  # 最多等待约10秒
             time.sleep(0.5)
             if sb.execute_script(_SOLVED_JS):
                 print(f"✅ Turnstile 通过（第 {attempt + 1} 次尝试）")
@@ -240,7 +251,15 @@ def handle_turnstile(sb) -> bool:
 
         print(f"⚠️ 第 {attempt + 1} 次未通过，重试...")
 
-    print("  ❌ Turnstile 6 次均失败")
+        # 每次失败后额外人类行为
+        if attempt < 5:
+            try:
+                sb.execute_script("window.scrollBy(0, random.randint(-60, 120));")
+            except:
+                pass
+            time.sleep(1.2)
+
+    print("  ❌ Turnstile 多次尝试均失败")
     return False
 
 #  账户登录
